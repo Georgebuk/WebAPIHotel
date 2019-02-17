@@ -22,7 +22,7 @@ namespace WebAPIHotel.Controllers
         public string Get(int id)
         {
             cmd = String.Format(cmd, id);
-            List<Object> bookings = new SQLHandler().execute(cmd, "Bookings");
+            List<Object> bookings = new SQLHandler().execute(cmd, RequestType.BOOKING_REQUEST);
             string jsonResponse = JsonConvert.SerializeObject(bookings);
             return jsonResponse;
         }
