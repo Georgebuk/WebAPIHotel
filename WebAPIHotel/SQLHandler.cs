@@ -2,6 +2,7 @@
 using System;
 using System.Collections.Generic;
 using System.Data.SqlClient;
+using System.Diagnostics;
 using System.Drawing;
 using System.Linq;
 using System.Text;
@@ -32,7 +33,7 @@ namespace WebAPIHotel
                         {
                             case RequestType.BOOKING_REQUEST:
                                 return getBookings(reader);
-                            case RequestType.HOTEL_REQUEST:
+                            case RequestType.HOTEL_GET_REQUEST:
                                 return getHotels(reader);
                         }
                        
@@ -42,6 +43,49 @@ namespace WebAPIHotel
             return null;
         }
 
+        public string executePost(RequestType type, Object objectToPost)
+        {
+            using (SqlConnection connection = new SqlConnection(connectionString))
+            {
+                connection.Open();
+                switch (type)
+                {
+                    case RequestType.HOTEL_POST_REQUEST:
+                        return null;
+                    case RequestType.BOOKING_POST_REQUEST:
+                        return addBooking(connection, objectToPost);
+                }
+            }
+            return "fail";
+        }
+
+        private string addBooking(SqlConnection connection, Object objectToPost)
+        {
+            string cmdString = "INSERT INTO cust_booking(hotel_id, cust_id, date_booking_made, date_for_booking, booking_activated, hide_booking) " +
+                "VALUES(@hotelID, @custID, @dateBookingMade, @dateForBooking, @BookingActivated, @HideBooking)";
+            Booking booking = (Booking)objectToPost;
+            try
+            {
+                using (SqlCommand sqlCommand = new SqlCommand(cmdString, connection))
+                {
+                    sqlCommand.Parameters.AddWithValue("@hotelID", booking.Hotel.HotelID);
+                    sqlCommand.Parameters.AddWithValue("@custID", booking.Customer.CustId);
+                    sqlCommand.Parameters.AddWithValue("@dateBookingMade", booking.DateBookingMade);
+                    sqlCommand.Parameters.AddWithValue("@dateForBooking", booking.DateOfBooking);
+                    sqlCommand.Parameters.AddWithValue("@BookingActivated", 0);
+                    sqlCommand.Parameters.AddWithValue("@HideBooking", 0);
+
+                    sqlCommand.ExecuteNonQuery();
+                    return "success";
+                }
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine("ERROR WHEN ADDING NEW BOOKING {0}", ex.Message);
+                return "fail";
+            }
+            
+        }
         //This method gets hotels from the database and parses the response into objects
         //This is done as one query as it is much faster than several queries each getting the hotel then the floors
         //then the rooms

@@ -1,4 +1,5 @@
-﻿using Newtonsoft.Json;
+﻿using HotelClassLibrary;
+using Newtonsoft.Json;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -10,7 +11,8 @@ namespace WebAPIHotel.Controllers
 {
     public class BookingController : ApiController
     {
-        string cmd = "SELECT * FROM cust_booking LEFT JOIN hotel ON cust_booking.hotel_id = hotel.hotel_id WHERE cust_id = {0};";
+        string getBookingsCMD = "SELECT * FROM cust_booking LEFT JOIN hotel ON cust_booking.hotel_id = hotel.hotel_id WHERE cust_id = {0};";
+        string addBookingCMD = "INSERT INTO cust_booking(hotel_id, cust_id, date_booking_made, date_for_booking, booking_activated, hide_booking)";
 
         // GET api/<controller>
         public IEnumerable<string> Get()
@@ -21,15 +23,16 @@ namespace WebAPIHotel.Controllers
         // GET api/<controller>/5
         public string Get(int id)
         {
-            cmd = String.Format(cmd, id);
-            List<Object> bookings = new SQLHandler().execute(cmd, RequestType.BOOKING_REQUEST);
+            getBookingsCMD = String.Format(getBookingsCMD, id);
+            List<Object> bookings = new SQLHandler().execute(getBookingsCMD, RequestType.BOOKING_REQUEST);
             string jsonResponse = JsonConvert.SerializeObject(bookings);
             return jsonResponse;
         }
 
         // POST api/<controller>
-        public void Post([FromBody]string value)
+        public void Post([FromBody]Booking value)
         {
+            new SQLHandler().executePost(RequestType.BOOKING_POST_REQUEST, value);
         }
 
         // PUT api/<controller>/5
