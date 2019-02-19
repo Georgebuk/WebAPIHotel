@@ -42,7 +42,8 @@ namespace WebAPIHotel
             }
             return null;
         }
-
+        //Method responsible for executing post requests, sorts by request type and takes the object to post
+        //This method takes an object instead of a cmd string to allow parametrisation
         public string executePost(RequestType type, Object objectToPost)
         {
             using (SqlConnection connection = new SqlConnection(connectionString))
@@ -61,19 +62,21 @@ namespace WebAPIHotel
 
         private string addBooking(SqlConnection connection, Object objectToPost)
         {
-            string cmdString = "INSERT INTO cust_booking(hotel_id, cust_id, date_booking_made, date_for_booking, booking_activated, hide_booking) " +
-                "VALUES(@hotelID, @custID, @dateBookingMade, @dateForBooking, @BookingActivated, @HideBooking)";
+            string cmdString = "INSERT INTO cust_booking(cust_id, date_booking_made, date_for_booking, booking_activated, hide_booking, hotel_id, room_ID) " +
+                "VALUES(@custID, @dateBookingMade, @dateForBooking, @BookingActivated, @HideBooking, @hotelID, @roomID)";
             Booking booking = (Booking)objectToPost;
             try
             {
                 using (SqlCommand sqlCommand = new SqlCommand(cmdString, connection))
                 {
-                    sqlCommand.Parameters.AddWithValue("@hotelID", booking.Hotel.HotelID);
+                    //Parameterize query to stop SQL Injection
                     sqlCommand.Parameters.AddWithValue("@custID", booking.Customer.CustId);
                     sqlCommand.Parameters.AddWithValue("@dateBookingMade", booking.DateBookingMade);
                     sqlCommand.Parameters.AddWithValue("@dateForBooking", booking.DateOfBooking);
                     sqlCommand.Parameters.AddWithValue("@BookingActivated", 0);
                     sqlCommand.Parameters.AddWithValue("@HideBooking", 0);
+                    sqlCommand.Parameters.AddWithValue("@hotelID", booking.Hotel.HotelID);
+                    sqlCommand.Parameters.AddWithValue("@roomID", booking.BookedRoom.RoomID);
 
                     sqlCommand.ExecuteNonQuery();
                     return "success";
@@ -164,36 +167,46 @@ namespace WebAPIHotel
         private List<Object> getBookings(SqlDataReader reader)
         {
             List<Object> bookings = new List<Object>();
+            List<Hotel> hotels = new List<Hotel>();
+            string cmdString = "SELECT * FROM hotel INNER JOIN HOTEL_FLOOR ON hotel.hotel_id = HOTEL_FLOOR.hotel_id INNER JOIN ROOM ON ROOM.hotel_floor_ID = HOTEL_FLOOR.hotel_floor_id WHERE hotel.hotel_id = {0}";
+            
+
             while (reader.Read())
             {
                 Booking b = new Booking
                 {
                     BookingID = Convert.ToInt32(reader["booking_id"]),
-                    //Replace object instansiation with Flyweight or collection of all hotels/active customers
-                    //Customer = new Customer
+                    //Hotel = new Hotel
                     //{
-                    //    CustId = Convert.ToInt32(reader["cust_id"]),
-                    //    First_name = reader["cust_first_name"].ToString(),
-                    //    Last_name = reader["cust_last_name"].ToString(),
-                    //    Email = reader["cust_email"].ToString(),
-                    //    Phone_number = reader["cust_phonenumber"].ToString(),
-                    //    DateOfBirth = DateTime.Parse(reader["cust_dob"].ToString())
+                    //    HotelID = Convert.ToInt32(reader["hotel_id"]),
+                    //    HotelName = reader["hotel_name"].ToString(),
+                    //    HotelPostcode = reader["hotel_postcode"].ToString(),
+                    //    AddressLine1 = reader["hotel_address1"].ToString(),
+                    //    AddressLine2 = reader["hotel_address2"].ToString(),
+                    //    City = reader["hotel_city"].ToString(),
                     //},
-                    Hotel = new Hotel
+                    BookedRoom = new Room
                     {
-                        HotelID = Convert.ToInt32(reader["hotel_id"]),
-                        HotelName = reader["hotel_name"].ToString(),
-                        HotelPostcode = reader["hotel_postcode"].ToString(),
-                        AddressLine1 = reader["hotel_address1"].ToString(),
-                        AddressLine2 = reader["hotel_address2"].ToString(),
-                        City = reader["hotel_city"].ToString(),
+                        RoomID = Convert.ToInt32(reader["room_id"]),
+                        RoomNumber = Convert.ToInt32(reader["room_number"]),
+                        PricePerDay = float.Parse(reader["price_per_day"].ToString())
                     },
                     DateBookingMade = DateTime.Parse(reader["date_booking_made"].ToString()),
                     DateOfBooking = DateTime.Parse(reader["date_for_booking"].ToString()),
                     Activated = (bool)reader["booking_activated"],
                     HideBooking = (bool)reader["hide_booking"]
                 };
-
+                int hotelID = Convert.ToInt32(reader["hotel_id"]);
+                var hotel = hotels.Find(h => h.HotelID == hotelID);
+                if (hotel == null)
+                {
+                    cmdString = String.Format(cmdString, hotelID);
+                    var gotHotel = execute(cmdString, RequestType.HOTEL_GET_REQUEST).Cast<Hotel>().ToList().ElementAt(0);
+                    hotels.Add(gotHotel);
+                    b.Hotel = gotHotel;
+                }
+                else
+                    b.Hotel = hotel;
                 bookings.Add(b);
             }
             return bookings;
