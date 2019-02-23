@@ -11,9 +11,7 @@ namespace WebAPIHotel.Controllers
 {
     public class BookingController : ApiController
     {
-        string getBookingsCMD = "SELECT * FROM cust_booking LEFT JOIN hotel ON cust_booking.hotel_id = hotel.hotel_id LEFT JOIN ROOM on cust_booking.room_ID = ROOM.room_ID WHERE cust_id = {0};";
-        string addBookingCMD = "INSERT INTO cust_booking(hotel_id, cust_id, date_booking_made, date_for_booking, booking_activated, hide_booking)";
-        string testCMD = "SELECT * FROM cust_booking WHERE cust_id = {0};";
+        string getBookingsCMD = "SELECT * FROM cust_booking LEFT JOIN ROOM on cust_booking.room_ID = ROOM.room_ID INNER JOIN hotel ON hotel.hotel_ID = ROOM.hotel_ID WHERE cust_id = {0};";
 
         // GET api/<controller>
         public IEnumerable<string> Get()

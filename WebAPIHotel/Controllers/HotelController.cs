@@ -1,4 +1,5 @@
-﻿using Newtonsoft.Json;
+﻿using HotelClassLibrary;
+using Newtonsoft.Json;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -10,8 +11,8 @@ namespace WebAPIHotel.Controllers
 {
     public class HotelController : ApiController
     {
-        string allHotelsCMD = "SELECT * FROM hotel INNER JOIN HOTEL_FLOOR ON hotel.hotel_id = HOTEL_FLOOR.hotel_id INNER JOIN ROOM ON ROOM.hotel_floor_ID = HOTEL_FLOOR.hotel_floor_id";
-        string specificHotelCMD = "SELECT * FROM hotel INNER JOIN HOTEL_FLOOR ON hotel.hotel_id = HOTEL_FLOOR.hotel_id INNER JOIN ROOM ON ROOM.hotel_floor_ID = HOTEL_FLOOR.hotel_floor_id WHERE hotel.hotel_id = {0}";
+        string allHotelsCMD = "SELECT * FROM hotel INNER JOIN ROOM ON ROOM.hotel_ID = HOTEL.hotel_id";
+        string specificHotelCMD = "SELECT * FROM hotel INNER JOIN ROOM ON ROOM.hotel_ID = HOTEL.hotel_id WHERE hotel.hotel_id = {0}";
 
         // GET: api/Hotel
         public string Get()
@@ -30,6 +31,17 @@ namespace WebAPIHotel.Controllers
             List<Object> hotels = new SQLHandler().execute(specificHotelCMD, RequestType.HOTEL_GET_REQUEST);
             string jsonResponse = JsonConvert.SerializeObject(hotels);
             return jsonResponse;
+        }
+
+        [Route("api/Hotel/CheckAvailable/{booking}")]
+        [HttpPost]
+        public string CheckAvailable([FromBody]Booking dateString)
+        {
+            int room = new SQLHandler().getAvailableRoom(dateString);
+            if (room < 1)
+                return "False";
+            else
+                return "True";
         }
 
         // POST: api/Hotel

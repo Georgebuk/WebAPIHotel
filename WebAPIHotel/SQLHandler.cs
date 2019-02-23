@@ -60,11 +60,72 @@ namespace WebAPIHotel
             return "fail";
         }
 
+        //Method responsible for finding and then assigning a room to a booking 
+        //based on the speicified date range
+        public int getAvailableRoom(Booking booking)
+        {
+            //Initialise ID as 0, 0 means no room found
+            int roomID = 0;
+            using (SqlConnection connection = new SqlConnection(connectionString))
+            {
+                connection.Open();
+                //Query to find rooms with bookings that overlap the specified dates requested
+                string cmd = "SELECT * FROM cust_booking WHERE(cust_booking.date_for_booking <= '" + booking.BookingFinishDate.ToString("yyyy/MM/dd") + "' AND '" + booking.DateOfBooking.ToString("yyyy/MM/dd") + "' <= cust_booking.booking_finish_date);";
+                List<int> bookedRooms = new List<int>();
+                //Query to select a room that does not have a booking for the specified dates
+                string getAvailableRoomCmd = "";
+                using (SqlCommand sqlCMD = new SqlCommand(cmd, connection))
+                {
+                    using (SqlDataReader reader = sqlCMD.ExecuteReader())
+                    {
+                        while (reader.Read())
+                        {
+                            bookedRooms.Add(Convert.ToInt32(reader["room_ID"]));
+                        }
+                        if (bookedRooms.Count != 0)
+                        {
+                            getAvailableRoomCmd = "SELECT TOP 1 * FROM ROOM WHERE room_ID NOT IN(";
+                            foreach (int i in bookedRooms)
+                            {
+                                if (i != bookedRooms.Last())
+                                    getAvailableRoomCmd += i + ",";
+                                else
+                                    getAvailableRoomCmd += i + ")";
+                            }
+                            getAvailableRoomCmd += " AND hotel_id = " + booking.Hotel.HotelID;
+                        }
+                        else
+                            getAvailableRoomCmd += "SELECT TOP 1 * FROM ROOM WHERE hotel_ID =" + booking.Hotel.HotelID;
+                    }
+                    using (SqlCommand cmd2 = new SqlCommand(getAvailableRoomCmd, connection))
+                    {
+                        SqlDataReader reader2 = cmd2.ExecuteReader();
+                        //If there are any rooms available in the specified time frame
+                        //get the room id
+                        if (reader2.HasRows)
+                        {
+                            reader2.Read();
+                            roomID = Convert.ToInt32(reader2["room_ID"]);
+                        }
+                    }
+                }
+            }
+            return roomID;
+        }
+
+        //This method handles the post request for bookings
+        //This method calls the getAvailableRooms method to assign a room to the booking
         private string addBooking(SqlConnection connection, Object objectToPost)
         {
-            string cmdString = "INSERT INTO cust_booking(cust_id, date_booking_made, date_for_booking, booking_activated, hide_booking, hotel_id, room_ID) " +
-                "VALUES(@custID, @dateBookingMade, @dateForBooking, @BookingActivated, @HideBooking, @hotelID, @roomID)";
+            //Setup the insert command with parameters
+            string cmdString = "INSERT INTO cust_booking(cust_id, date_booking_made, date_for_booking, booking_finish_date, booking_activated, hide_booking, hotel_id, room_ID) " +
+                "VALUES(@custID, @dateBookingMade, @dateForBooking, @BookingFinishDate, @BookingActivated, @HideBooking, @hotelID, @roomID);";
+            
+            //Cast object to booking to access its properties
             Booking booking = (Booking)objectToPost;
+            //Check the database for overlapping booking information and get available room
+            int roomID = getAvailableRoom(booking);
+
             try
             {
                 using (SqlCommand sqlCommand = new SqlCommand(cmdString, connection))
@@ -73,10 +134,11 @@ namespace WebAPIHotel
                     sqlCommand.Parameters.AddWithValue("@custID", booking.Customer.CustId);
                     sqlCommand.Parameters.AddWithValue("@dateBookingMade", booking.DateBookingMade);
                     sqlCommand.Parameters.AddWithValue("@dateForBooking", booking.DateOfBooking);
+                    sqlCommand.Parameters.AddWithValue("@BookingFinishDate", booking.BookingFinishDate);
                     sqlCommand.Parameters.AddWithValue("@BookingActivated", 0);
                     sqlCommand.Parameters.AddWithValue("@HideBooking", 0);
                     sqlCommand.Parameters.AddWithValue("@hotelID", booking.Hotel.HotelID);
-                    sqlCommand.Parameters.AddWithValue("@roomID", booking.BookedRoom.RoomID);
+                    sqlCommand.Parameters.AddWithValue("@roomID", roomID);
 
                     sqlCommand.ExecuteNonQuery();
                     return "success";
@@ -89,6 +151,7 @@ namespace WebAPIHotel
             }
             
         }
+
         //This method gets hotels from the database and parses the response into objects
         //This is done as one query as it is much faster than several queries each getting the hotel then the floors
         //then the rooms
@@ -103,18 +166,13 @@ namespace WebAPIHotel
                 //Check if hotel already exists in list
                 Hotel h = hotels.Find(hotel => hotel.HotelID == HotelID);
 
-                //Create Floor from reader
-                Floor f = new Floor
-                {
-                    FloorID = Convert.ToInt32(reader["hotel_floor_ID"]),
-                    FloorNumber = Convert.ToInt32(reader["floor_number"])
-                };
                 //Create Room from reader
                 Room r = new Room
                 {
                     RoomID = Convert.ToInt32(reader["room_ID"]),
                     RoomNumber = Convert.ToInt32(reader["room_number"]),
-                    PricePerDay = float.Parse(reader["price_per_day"].ToString())
+                    PricePerDay = float.Parse(reader["price_per_day"].ToString()),
+                    IsAvailable = (bool)reader["is_room_available"]
                 };
                 //if the hotel does not already exist
                 if (h == null)
@@ -131,32 +189,15 @@ namespace WebAPIHotel
                         ImageURL = @"@drawable/premierInn.jpg",
                         HotelDesc = reader["hotel_desc"].ToString()
                     };
-                    //Add Room to the floor
-                    f.RoomsOnFloor.Add(r);
-                    //Add Floor to the hotel
-                    hot.FloorsInHotel.Add(f);
+                    //Add Room to the Hotel
+                    hot.RoomsInHotel.Add(r);
                     //Finally add the hotel to the list of hotels
                     hotels.Add(hot);
                 }
                 //Hotel does exist
                 else
                 {
-                    //Check if floor already exists in a hotel
-                    Floor floor = h.FloorsInHotel.Find(flo => flo.FloorID == f.FloorID);
-                    //If the floor does not already exist
-                    if (floor == null)
-                    {
-                        //Add room to the floor
-                        f.RoomsOnFloor.Add(r);
-                        //Add floor to the hotel
-                        h.FloorsInHotel.Add(f);
-                    }
-                    //If the floor does exist
-                    else
-                    {
-                        //Add the room to the floor
-                        floor.RoomsOnFloor.Add(r);
-                    }
+                    h.RoomsInHotel.Add(r);
                 }
                 
             }
@@ -176,15 +217,16 @@ namespace WebAPIHotel
                 Booking b = new Booking
                 {
                     BookingID = Convert.ToInt32(reader["booking_id"]),
-                    //Hotel = new Hotel
-                    //{
-                    //    HotelID = Convert.ToInt32(reader["hotel_id"]),
-                    //    HotelName = reader["hotel_name"].ToString(),
-                    //    HotelPostcode = reader["hotel_postcode"].ToString(),
-                    //    AddressLine1 = reader["hotel_address1"].ToString(),
-                    //    AddressLine2 = reader["hotel_address2"].ToString(),
-                    //    City = reader["hotel_city"].ToString(),
-                    //},
+                    Hotel = new Hotel
+                    {
+                        HotelID = Convert.ToInt32(reader["hotel_id"]),
+                        HotelName = reader["hotel_name"].ToString(),
+                        HotelPostcode = reader["hotel_postcode"].ToString(),
+                        AddressLine1 = reader["hotel_address1"].ToString(),
+                        AddressLine2 = reader["hotel_address2"].ToString(),
+                        City = reader["hotel_city"].ToString(),
+                        HotelDesc = reader["hotel_desc"].ToString()
+                    },
                     BookedRoom = new Room
                     {
                         RoomID = Convert.ToInt32(reader["room_id"]),
@@ -196,17 +238,17 @@ namespace WebAPIHotel
                     Activated = (bool)reader["booking_activated"],
                     HideBooking = (bool)reader["hide_booking"]
                 };
-                int hotelID = Convert.ToInt32(reader["hotel_id"]);
-                var hotel = hotels.Find(h => h.HotelID == hotelID);
-                if (hotel == null)
-                {
-                    cmdString = String.Format(cmdString, hotelID);
-                    var gotHotel = execute(cmdString, RequestType.HOTEL_GET_REQUEST).Cast<Hotel>().ToList().ElementAt(0);
-                    hotels.Add(gotHotel);
-                    b.Hotel = gotHotel;
-                }
-                else
-                    b.Hotel = hotel;
+                //int hotelID = Convert.ToInt32(reader["hotel_id"]);
+                //var hotel = hotels.Find(h => h.HotelID == hotelID);
+                //if (hotel == null)
+                //{
+                //    cmdString = String.Format(cmdString, hotelID);
+                //    var gotHotel = execute(cmdString, RequestType.HOTEL_GET_REQUEST).Cast<Hotel>().ToList().ElementAt(0);
+                //    hotels.Add(gotHotel);
+                //    b.Hotel = gotHotel;
+                //}
+                //else
+                //    b.Hotel = hotel;
                 bookings.Add(b);
             }
             return bookings;
