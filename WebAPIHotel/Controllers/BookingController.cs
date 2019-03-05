@@ -34,6 +34,14 @@ namespace WebAPIHotel.Controllers
             new SQLHandler().executePost(RequestType.BOOKING_POST_REQUEST, value);
         }
 
+        [Route("api/Booking/CheckQR/{QRString}")]
+        [HttpGet]
+        public string CheckQR(string QRString)
+        {
+            string qrexists = new SQLHandler().checkQRString(QRString);
+            return qrexists;
+        }
+
         // PUT api/<controller>/5
         public void Put(int id, [FromBody]string value)
         {

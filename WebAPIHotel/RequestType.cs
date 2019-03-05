@@ -10,6 +10,7 @@ namespace WebAPIHotel
         HOTEL_GET_REQUEST,
         HOTEL_POST_REQUEST,
         BOOKING_REQUEST,
-        BOOKING_POST_REQUEST
+        BOOKING_POST_REQUEST,
+        QR_STRING_CHECK_REQUEST
     }
 }

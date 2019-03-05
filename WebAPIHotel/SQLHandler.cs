@@ -19,6 +19,7 @@ namespace WebAPIHotel
         //This method executes whatever query is passed to it from the controllers
         //Parsing the SQL Data into objects is then delegated to the appropriate method
         //depending upon the request type
+
         public List<Object> execute(string cmdString, RequestType type)
         {
             List<Object> objects = new List<object>();
@@ -35,6 +36,7 @@ namespace WebAPIHotel
                                 return getBookings(reader);
                             case RequestType.HOTEL_GET_REQUEST:
                                 return getHotels(reader);
+                            
                         }
                        
                     }
@@ -44,6 +46,7 @@ namespace WebAPIHotel
         }
         //Method responsible for executing post requests, sorts by request type and takes the object to post
         //This method takes an object instead of a cmd string to allow parametrisation
+
         public string executePost(RequestType type, Object objectToPost)
         {
             using (SqlConnection connection = new SqlConnection(connectionString))
@@ -118,8 +121,8 @@ namespace WebAPIHotel
         private string addBooking(SqlConnection connection, Object objectToPost)
         {
             //Setup the insert command with parameters
-            string cmdString = "INSERT INTO cust_booking(cust_id, date_booking_made, date_for_booking, booking_finish_date, booking_activated, hide_booking, hotel_id, room_ID) " +
-                "VALUES(@custID, @dateBookingMade, @dateForBooking, @BookingFinishDate, @BookingActivated, @HideBooking, @hotelID, @roomID);";
+            string cmdString = "INSERT INTO cust_booking(cust_id, date_booking_made, date_for_booking, booking_finish_date, booking_activated, hide_booking, hotel_id, room_ID, qrcode_guid) " +
+                "VALUES(@custID, @dateBookingMade, @dateForBooking, @BookingFinishDate, @BookingActivated, @HideBooking, @hotelID, @roomID, @QRCode);";
             
             //Cast object to booking to access its properties
             Booking booking = (Booking)objectToPost;
@@ -139,6 +142,8 @@ namespace WebAPIHotel
                     sqlCommand.Parameters.AddWithValue("@HideBooking", 0);
                     sqlCommand.Parameters.AddWithValue("@hotelID", booking.Hotel.HotelID);
                     sqlCommand.Parameters.AddWithValue("@roomID", roomID);
+                    //Generate unique ID for the QRCode, this will be converted into a bitmap in the phone app
+                    sqlCommand.Parameters.AddWithValue("@QRCode", Guid.NewGuid().ToString());
 
                     sqlCommand.ExecuteNonQuery();
                     return "success";
@@ -236,7 +241,8 @@ namespace WebAPIHotel
                     DateBookingMade = DateTime.Parse(reader["date_booking_made"].ToString()),
                     DateOfBooking = DateTime.Parse(reader["date_for_booking"].ToString()),
                     Activated = (bool)reader["booking_activated"],
-                    HideBooking = (bool)reader["hide_booking"]
+                    HideBooking = (bool)reader["hide_booking"],
+                    QrcodeString = reader["qrcode_guid"].ToString()
                 };
                 //int hotelID = Convert.ToInt32(reader["hotel_id"]);
                 //var hotel = hotels.Find(h => h.HotelID == hotelID);
@@ -252,6 +258,26 @@ namespace WebAPIHotel
                 bookings.Add(b);
             }
             return bookings;
+        }
+
+        public string checkQRString(string QRString)
+        {
+            string QUERY = "SELECT * FROM cust_booking WHERE qrcode_guid = @QRString";
+            using (SqlConnection connection = new SqlConnection(connectionString))
+            {
+                connection.Open();
+                using (SqlCommand sqlCommand = new SqlCommand(QUERY, connection))
+                {
+                    sqlCommand.Parameters.AddWithValue("@QRString", QRString);
+                    using (SqlDataReader reader = sqlCommand.ExecuteReader())
+                    {
+                        if (reader.HasRows)
+                            return "success";
+                        else
+                            return "fail";
+                    }
+                }
+            }
         }
     }
 }
