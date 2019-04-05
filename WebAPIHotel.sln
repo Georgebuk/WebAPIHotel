@@ -7,6 +7,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "WebAPIHotel", "WebAPIHotel\
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "HotelClassLibrary", "G:\Tests\HotelClassLibrary\HotelClassLibrary\HotelClassLibrary.csproj", "{076157D0-FD54-44A5-91B6-DDC13F1DD4BA}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "UnitTestService", "UnitTestService\UnitTestService.csproj", "{94C998FE-AEEA-4245-AF5F-4ACADD164435}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -21,6 +23,10 @@ Global
 		{076157D0-FD54-44A5-91B6-DDC13F1DD4BA}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{076157D0-FD54-44A5-91B6-DDC13F1DD4BA}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{076157D0-FD54-44A5-91B6-DDC13F1DD4BA}.Release|Any CPU.Build.0 = Release|Any CPU
+		{94C998FE-AEEA-4245-AF5F-4ACADD164435}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{94C998FE-AEEA-4245-AF5F-4ACADD164435}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{94C998FE-AEEA-4245-AF5F-4ACADD164435}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{94C998FE-AEEA-4245-AF5F-4ACADD164435}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
