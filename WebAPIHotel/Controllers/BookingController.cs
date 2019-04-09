@@ -12,7 +12,7 @@ namespace WebAPIHotel.Controllers
     public class BookingController : ApiController
     {
         string getBookingsCMD = "SELECT * FROM cust_booking LEFT JOIN ROOM on cust_booking.room_ID = ROOM.room_ID INNER JOIN hotel ON hotel.hotel_ID = ROOM.hotel_ID WHERE cust_id = {0};";
-
+        public BookingController() { }
         // GET api/<controller>
         public IEnumerable<string> Get()
         {

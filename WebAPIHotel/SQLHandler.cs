@@ -16,6 +16,7 @@ namespace WebAPIHotel
         private static string connectionString = "Data Source=(LocalDB)\\MSSQLLocalDB;AttachDbFilename=C:\\Users\\George\\source\\repos\\WebAPIHotel\\WebAPIHotel\\App_Data\\Database1.mdf;Integrated Security=True";
         public SQLHandler()
         { }
+
         //This method executes whatever query is passed to it from the controllers
         //Parsing the SQL Data into objects is then delegated to the appropriate method
         //depending upon the request type
@@ -334,8 +335,11 @@ namespace WebAPIHotel
                 FOREIGN KEY([hotel_ID]) REFERENCES[dbo].[hotel] ([hotel_id])
                 );" +
 
-                @"INSERT INTO hot_cust(cust_first_name, cust_last_name, cust_email, cust_phonenumber, cust_dob) 
-                VALUES('George', 'Boulton', 'george.boulton@hotmail.co.uk', '07411762329', '1996/05/21');" +
+                @"INSERT INTO hot_cust(cust_first_name, cust_last_name, cust_email, cust_phonenumber, cust_dob, cust_password) 
+                VALUES ('George', 'Boulton', 'george.boulton@hotmail.co.uk', '07411762329', '1996/05/21', 'LHvGkIp870LnugAwmLYbeJgvbIAD8+kyZZkTJR4QIIPUWQ9j');" +
+
+                @"INSERT INTO hot_cust(cust_first_name, cust_last_name, cust_email, cust_phonenumber, cust_dob, cust_password) 
+                VALUES ('Johnathon', 'Smith', 'john.smith@jsmith.com', '07411762329', '1995/01/14', 'uXh1PNcPW1ucWC8sehgDaG/haGkrA3DeUnx6xLYDCzhZDwGL');" +
 
                 @"INSERT INTO hotel(hotel_name, hotel_postcode, hotel_address1, hotel_address2, hotel_city, hotel_desc)
                 VALUES('Premier Inn', 'ST4 2DU', '30 Avenue Road', '', 'Stoke-on-Trent', 'THIS IS A HOTEL IT IS VERY NICE');" +
@@ -407,7 +411,7 @@ namespace WebAPIHotel
                     {
                         reader.Read();
 
-                        customer = new Customer
+                        Customer c = new Customer
                         {
                             CustId = Convert.ToInt32(reader["cust_id"].ToString()),
                             First_name = reader["cust_first_name"].ToString(),
@@ -418,8 +422,9 @@ namespace WebAPIHotel
                             Password = reader["cust_password"].ToString()
                         };
 
-                        bool UserVerified = PasswordVerifyer.Verify(password, customer.Password);
-                        return customer;
+                        bool UserVerified = PasswordVerifyer.Verify(password, c.Password);
+                        if(UserVerified)
+                            return customer = c;
 
                     }
                 }

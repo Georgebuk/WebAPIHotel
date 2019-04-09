@@ -13,6 +13,7 @@ namespace WebAPIHotel.Controllers
             string jsonResponse = JsonConvert.SerializeObject(customer);
             return jsonResponse;
         }
+
         // POST api/<controller>
         public string Post([FromBody]UserDetailsAPIModel model)
         {
