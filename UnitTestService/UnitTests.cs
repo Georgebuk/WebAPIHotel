@@ -23,7 +23,7 @@ namespace UnitTestService
         [ClassInitialize]
         public static void Setup(TestContext testContext)
         {
-            handler.databaseSetup();
+            handler.DatabaseSetup();
             TestCustomer = new Customer
             {
                 CustId = 1,

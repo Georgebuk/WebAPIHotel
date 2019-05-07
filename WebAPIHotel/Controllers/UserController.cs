@@ -9,7 +9,7 @@ namespace WebAPIHotel.Controllers
         // GET api/<controller>
         public string Get(string email, string password)
         {
-            Customer customer = new SQLHandler().getUser(email, password);
+            Customer customer = new SQLHandler().GetUser(email, password);
             string jsonResponse = JsonConvert.SerializeObject(customer);
             return jsonResponse;
         }
@@ -17,7 +17,7 @@ namespace WebAPIHotel.Controllers
         // POST api/<controller>
         public string Post([FromBody]UserDetailsAPIModel model)
         {
-            Customer customer = new SQLHandler().getUser(model.Email, model.Password);
+            Customer customer = new SQLHandler().GetUser(model.Email, model.Password);
             string jsonResponse = JsonConvert.SerializeObject(customer);
             return jsonResponse;
         }
@@ -26,7 +26,7 @@ namespace WebAPIHotel.Controllers
         [HttpPost]
         public ErrorEnum Register([FromBody]Customer c)
         {
-            return new SQLHandler().executePost(RequestType.ADD_NEW_USER_POST_REQUEST, c);
+            return new SQLHandler().ExecutePost(RequestType.ADD_NEW_USER_POST_REQUEST, c);
         }
     }
 }

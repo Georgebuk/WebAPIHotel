@@ -21,7 +21,7 @@ namespace WebAPIHotel
         //Parsing the SQL Data into objects is then delegated to the appropriate method
         //depending upon the request type
 
-        public List<Object> execute(string cmdString, RequestType type)
+        public List<Object> Execute(string cmdString, RequestType type)
         {
             List<Object> objects = new List<object>();
             using (SqlConnection connection = new SqlConnection(connectionString))
@@ -34,9 +34,9 @@ namespace WebAPIHotel
                         switch (type)
                         {
                             case RequestType.BOOKING_REQUEST:
-                                return getBookings(reader);
+                                return GetBookings(reader);
                             case RequestType.HOTEL_GET_REQUEST:
-                                return getHotels(reader);
+                                return GetHotels(reader);
 
                         }
 
@@ -48,7 +48,7 @@ namespace WebAPIHotel
         //Method responsible for executing post requests, sorts by request type and takes the object to post
         //This method takes an object instead of a cmd string to allow parametrisation
 
-        public ErrorEnum executePost(RequestType type, Object objectToPost)
+        public ErrorEnum ExecutePost(RequestType type, Object objectToPost)
         {
             using (SqlConnection connection = new SqlConnection(connectionString))
             {
@@ -58,7 +58,7 @@ namespace WebAPIHotel
                     case RequestType.HOTEL_POST_REQUEST:
                         return ErrorEnum.USER_EXISTS_ERROR;
                     case RequestType.BOOKING_POST_REQUEST:
-                        return addBooking(connection, objectToPost);
+                        return AddBooking(connection, objectToPost);
                     case RequestType.ADD_NEW_USER_POST_REQUEST:
                         return RegisterNewUser(objectToPost);
                 }
@@ -68,7 +68,7 @@ namespace WebAPIHotel
 
         //Method responsible for finding and then assigning a room to a booking 
         //based on the speicified date range
-        public int getAvailableRoom(Booking booking)
+        public int GetAvailableRoom(Booking booking)
         {
             //Initialise ID as 0, 0 means no room found
             int roomID = 0;
@@ -76,7 +76,7 @@ namespace WebAPIHotel
             {
                 connection.Open();
                 //Query to find rooms with bookings that overlap the specified dates requested
-                string cmd = "SELECT * FROM cust_booking WHERE(cust_booking.date_for_booking <= '" + booking.BookingFinishDate.ToString("yyyy/MM/dd") + "' AND '" + booking.DateOfBooking.ToString("yyyy/MM/dd") + "' <= cust_booking.booking_finish_date);";
+                string cmd = "SELECT * FROM cust_booking WHERE(cust_booking.date_for_booking <= '" + booking.BookingFinishDate.ToString("yyyy/MM/dd") + "' AND '" + booking.DateOfBooking.ToString("yyyy/MM/dd") + "' <= cust_booking.booking_finish_date)";
                 List<int> bookedRooms = new List<int>();
                 //Query to select a room that does not have a booking for the specified dates
                 string getAvailableRoomCmd = "";
@@ -98,10 +98,10 @@ namespace WebAPIHotel
                                 else
                                     getAvailableRoomCmd += i + ")";
                             }
-                            getAvailableRoomCmd += " AND hotel_id = " + booking.Hotel.HotelID;
+                            getAvailableRoomCmd += " AND hotel_id = " + booking.Hotel.HotelID + " AND IsAvailable = 1";
                         }
                         else
-                            getAvailableRoomCmd += "SELECT TOP 1 * FROM ROOM WHERE hotel_ID =" + booking.Hotel.HotelID;
+                            getAvailableRoomCmd += "SELECT TOP 1 * FROM ROOM WHERE hotel_ID =" + booking.Hotel.HotelID + " AND IsAvailable = 1";
                     }
                     using (SqlCommand cmd2 = new SqlCommand(getAvailableRoomCmd, connection))
                     {
@@ -121,16 +121,16 @@ namespace WebAPIHotel
 
         //This method handles the post request for bookings
         //This method calls the getAvailableRooms method to assign a room to the booking
-        private ErrorEnum addBooking(SqlConnection connection, Object objectToPost)
+        private ErrorEnum AddBooking(SqlConnection connection, Object objectToPost)
         {
             //Setup the insert command with parameters
-            string cmdString = "INSERT INTO cust_booking(cust_id, date_booking_made, date_for_booking, booking_finish_date, booking_activated, hide_booking, room_ID, qrcode_guid) " +
-                "VALUES(@custID, @dateBookingMade, @dateForBooking, @BookingFinishDate, @BookingActivated, @HideBooking, @roomID, @QRCode);";
+            string cmdString = "INSERT INTO cust_booking(cust_id, date_booking_made, date_for_booking, booking_finish_date, booking_activated, hide_booking, room_ID, qrcode_guid, booking_completed) " +
+                "VALUES(@custID, @dateBookingMade, @dateForBooking, @BookingFinishDate, @BookingActivated, @HideBooking, @roomID, @QRCode, @Completed);";
 
             //Cast object to booking to access its properties
             Booking booking = (Booking)objectToPost;
             //Check the database for overlapping booking information and get available room
-            int roomID = getAvailableRoom(booking);
+            int roomID = GetAvailableRoom(booking);
 
             try
             {
@@ -146,6 +146,7 @@ namespace WebAPIHotel
                     sqlCommand.Parameters.AddWithValue("@roomID", roomID);
                     //Generate unique ID for the QRCode, this will be converted into a bitmap in the phone app
                     sqlCommand.Parameters.AddWithValue("@QRCode", Guid.NewGuid().ToString());
+                    sqlCommand.Parameters.AddWithValue("@Completed", 0);
 
                     sqlCommand.ExecuteNonQuery();
                     return ErrorEnum.SUCCESS;
@@ -162,7 +163,7 @@ namespace WebAPIHotel
         //This method gets hotels from the database and parses the response into objects
         //This is done as one query as it is much faster than several queries each getting the hotel then the floors
         //then the rooms
-        private List<object> getHotels(SqlDataReader reader)
+        private List<object> GetHotels(SqlDataReader reader)
         {
             List<Hotel> hotels = new List<Hotel>();
 
@@ -174,12 +175,7 @@ namespace WebAPIHotel
                 Hotel h = hotels.Find(hotel => hotel.HotelID == HotelID);
 
                 //Create Room from reader
-                Room r = new Room
-                {
-                    RoomID = Convert.ToInt32(reader["room_ID"]),
-                    RoomNumber = Convert.ToInt32(reader["room_number"]),
-                    PricePerDay = float.Parse(reader["price_per_day"].ToString())
-                };
+                Room r = ConstructRoom(reader);
                 //if the hotel does not already exist
                 if (h == null)
                 {
@@ -211,7 +207,7 @@ namespace WebAPIHotel
         }
 
         //This method gets all the customers bookings
-        private List<Object> getBookings(SqlDataReader reader)
+        private List<Object> GetBookings(SqlDataReader reader)
         {
             List<Object> bookings = new List<Object>();
             List<Hotel> hotels = new List<Hotel>();
@@ -242,16 +238,75 @@ namespace WebAPIHotel
                     BookingFinishDate = DateTime.Parse(reader["booking_finish_date"].ToString()),
                     Activated = (bool)reader["booking_activated"],
                     HideBooking = (bool)reader["hide_booking"],
-                    QrcodeString = reader["qrcode_guid"].ToString()
+                    QrcodeString = reader["qrcode_guid"].ToString(),
+                    Completed = (bool)reader["booking_completed"]
                 };
+
+                if(b.BookingFinishDate < DateTime.Today)
+                {
+                    MarkBookingAsCompleted(b.BookingID);
+                    b.Completed = true;
+                    if (b.Activated)
+                        b.Activated = false;
+                }
+                else if(CheckDateInRange(b.DateOfBooking, b.BookingFinishDate))
+                {
+                    if (!CheckRoomIsAvailable(b.BookedRoom.RoomID))
+                    {
+                        int newRoom = GetAvailableRoom(b);
+                         b.BookedRoom = UpdateBookingRoom(b, newRoom);
+                    }
+                }
  
                 bookings.Add(b);
             }
             return bookings;
         }
 
+        private Room UpdateBookingRoom(Booking b, int newRoom)
+        {
+            string QUERY = "UPDATE cust_booking SET room_ID = @NewRoom WHERE booking_id = @BookingID; " +
+                "SELECT * FROM ROOM WHERE room_ID = @NewRoom"  ;
+            using (SqlConnection connection = new SqlConnection(connectionString))
+            {
+                connection.Open();
+                using (SqlCommand sqlCommand = new SqlCommand(QUERY, connection))
+                {
+                    sqlCommand.Parameters.AddWithValue("@NewRoom", newRoom);
+                    sqlCommand.Parameters.AddWithValue("@BookingID", b.BookingID);
+
+                    using (SqlDataReader reader = sqlCommand.ExecuteReader())
+                    {
+                        reader.Read();
+                        return ConstructRoom(reader);
+                    }
+                }
+            }
+        }
+
+        private bool CheckRoomIsAvailable(int roomID)
+        {
+            string QUERY = "SELECT IsAvailable FROM ROOM WHERE room_ID = @RoomID";
+            using (SqlConnection connection = new SqlConnection(connectionString))
+            {
+                connection.Open();
+                using (SqlCommand sqlCommand = new SqlCommand(QUERY, connection))
+                {
+                    sqlCommand.Parameters.AddWithValue("@RoomID", roomID);
+                    using (SqlDataReader reader = sqlCommand.ExecuteReader())
+                    {
+                        reader.Read();
+                        if (reader.HasRows)
+                            return (bool)reader["IsAvailable"];
+                        else
+                            return false;
+                    }
+                }
+            }
+        }
+
         //Method to check if a scanned QR Code exists and is for the current booking date
-        public string checkQRString(string QRString)
+        public string CheckQRString(string QRString)
         {
             string QUERY = "SELECT * FROM cust_booking WHERE qrcode_guid = @QRString";
             using (SqlConnection connection = new SqlConnection(connectionString))
@@ -266,28 +321,93 @@ namespace WebAPIHotel
                         reader.Read();
                         DateTime dateOfBooking = Convert.ToDateTime(reader["date_for_booking"]);
                         DateTime dateOfBookingEnd = Convert.ToDateTime(reader["booking_finish_date"]);
-                        bool bookingDateValid = checkDateInRange(dateOfBooking, dateOfBookingEnd);
-                        if (reader.HasRows && bookingDateValid)
-                            return "success";
+                        bool bookingDateValid = CheckDateInRange(dateOfBooking, dateOfBookingEnd);
+                        int bookingID = Convert.ToInt32(reader["booking_id"]);
+                        if (reader.HasRows)
+                        {
+                            if (!bookingDateValid)
+                            {
+                                if (dateOfBookingEnd < DateTime.Now)
+                                {
+                                    MarkBookingAsCompleted(bookingID);
+                                    return "bookingEnded";
+                                }
+                                return "badDate";
+                            }
+
+                            MarkBookingAsActive(bookingID);
+                            return "success" + Convert.ToInt32(reader["room_ID"]);
+                        }
                         else
+                        {
+                            
                             return "fail";
+                        }
                     }
                 }
             }
         }
+
+        private void MarkBookingAsActive(int bookingID)
+        {
+            using (SqlConnection connection = new SqlConnection(connectionString))
+            {
+                string QUERY = "UPDATE cust_booking SET booking_activated = 1 WHERE booking_id = " + bookingID;
+                connection.Open();
+                using (SqlCommand cmd = new SqlCommand(QUERY, connection))
+                {
+                    cmd.ExecuteNonQuery();
+                }
+            }
+        }
+
+        public void MarkBookingAsCompleted(int bookingID)
+        {
+            using (SqlConnection connection = new SqlConnection(connectionString))
+            {
+                string QUERY = "UPDATE cust_booking SET booking_completed = 1, booking_activated = 0 WHERE booking_id = " + bookingID + ";";
+                connection.Open();
+                using (SqlCommand cmd = new SqlCommand(QUERY, connection))
+                {
+                    cmd.ExecuteNonQuery();
+                }
+            }
+        }
+
+        public bool Checkout(int bookingID)
+        {
+            //Complete the booking
+            MarkBookingAsCompleted(bookingID);
+            //Change the booking date to have finished earlier
+            string QUERY = "UPDATE cust_booking SET booking_finish_date = @NewFinish WHERE booking_id = @BookingID;";
+            using (SqlConnection connection = new SqlConnection(connectionString))
+            {
+                connection.Open();
+                using (SqlCommand sqlCommand = new SqlCommand(QUERY, connection))
+                {
+                    sqlCommand.Parameters.AddWithValue("@NewFinish", DateTime.Now.Date);
+                    sqlCommand.Parameters.AddWithValue("@BookingID", bookingID);
+                    return true;
+                }
+            }
+        }
+
+
         //Method checks if the the user is activating a booking within the correct dates
-        private bool checkDateInRange(DateTime startDate, DateTime endDate)
+        private bool CheckDateInRange(DateTime startDate, DateTime endDate)
         {
             return DateTime.Now >= startDate && DateTime.Now < endDate;
         }
 
         //Methoid to re initilize the database for unit testing
-        public bool databaseSetup()
+        public bool DatabaseSetup()
         {
-            string QUERY = "DROP TABLE cust_booking;"
-                + "DROP TABLE ROOM;"
-                + "DROP TABLE hot_cust;"
-                + "DROP TABLE hotel;" +
+            string QUERY = "DROP TABLE IF EXISTS room_report;"
+                + "DROP TABLE IF EXISTS ROOM;"
+                + "DROP TABLE IF EXISTS hot_staff;"
+                + "DROP TABLE IF EXISTS cust_booking;"
+                + "DROP TABLE IF EXISTS hot_cust;"
+                + "DROP TABLE IF EXISTS hotel;" +
 
 
                 @"CREATE TABLE [dbo].[hot_cust] (
@@ -322,6 +442,7 @@ namespace WebAPIHotel
                 [room_ID]             INT NULL,
                 [booking_finish_date] DATE NULL,
                 [qrcode_guid]         VARCHAR(36) NULL,
+                [booking_completed]   BIT DEFAULT((0)) NOT NULL,
                 PRIMARY KEY CLUSTERED([booking_id] ASC),
                 FOREIGN KEY([cust_id]) REFERENCES[dbo].[hot_cust] ([cust_id])
                 );" +
@@ -331,8 +452,29 @@ namespace WebAPIHotel
                 [room_number]       INT NOT NULL,
                 [price_per_day] FLOAT(53) NULL,
                 [hotel_ID]          INT NULL,
+                [IsAvailable]   BIT        DEFAULT ((1)) NOT NULL,
                 PRIMARY KEY CLUSTERED([room_ID] ASC),
                 FOREIGN KEY([hotel_ID]) REFERENCES[dbo].[hotel] ([hotel_id])
+                );" +
+
+                @"CREATE TABLE [dbo].[hot_staff] (
+	            [staff_id]         INT           IDENTITY (1, 1) NOT NULL,
+	            [hotel_id]         INT           NOT NULL,
+	            [staff_first_name] VARCHAR (255) NOT NULL,
+	            [staff_last_name]  VARCHAR (255) NOT NULL,
+	            [username]         VARCHAR (255) NOT NULL,
+	            [staff_password]   VARCHAR (255) NULL,
+	            PRIMARY KEY CLUSTERED ([staff_id] ASC),
+	            FOREIGN KEY ([hotel_id]) REFERENCES [dbo].[hotel] ([hotel_id])
+                );" +
+
+                @"CREATE TABLE [dbo].[room_report] (
+                [room_report_id] INT           IDENTITY (1, 1) NOT NULL,
+                [room_ID]        INT           NOT NULL,
+                [report]         VARCHAR (300) NOT NULL,
+                [reporttime]     TIMESTAMP    NOT NULL,
+                PRIMARY KEY CLUSTERED ([room_report_id] ASC),
+                FOREIGN KEY ([room_ID]) REFERENCES [dbo].[ROOM] ([room_ID])
                 );" +
 
                 @"INSERT INTO hot_cust(cust_first_name, cust_last_name, cust_email, cust_phonenumber, cust_dob, cust_password) 
@@ -342,20 +484,23 @@ namespace WebAPIHotel
                 VALUES ('Johnathon', 'Smith', 'john.smith@jsmith.com', '07411762329', '1995/01/14', 'uXh1PNcPW1ucWC8sehgDaG/haGkrA3DeUnx6xLYDCzhZDwGL');" +
 
                 @"INSERT INTO hotel(hotel_name, hotel_postcode, hotel_address1, hotel_address2, hotel_city, hotel_desc)
-                VALUES('Premier Inn', 'ST4 2DU', '30 Avenue Road', '', 'Stoke-on-Trent', 'THIS IS A HOTEL IT IS VERY NICE');" +
+                VALUES('Hotel', 'ST4 2DU', '30 Avenue Road', '', 'Stoke-on-Trent', 'THIS IS A HOTEL IT IS VERY NICE');" +
 
                 @"INSERT INTO hotel(hotel_name, hotel_postcode, hotel_address1, hotel_address2, hotel_city, hotel_desc)
-                VALUES('A Different Premier Inn', 'ST4 2DP', '32 Avenue Road', '', 'Stoke-on-Trent', 'THIS IS A HOTEL IT IS ALSO VERY NICE');" +
+                VALUES('A Different Hotel', 'ST4 2DP', '32 Avenue Road', '', 'Stoke-on-Trent', 'THIS IS A HOTEL IT IS ALSO VERY NICE');" +
 
-                @"INSERT INTO cust_booking(cust_id, date_booking_made, date_for_booking, booking_activated, hide_booking, room_ID, booking_finish_date, qrcode_guid)
-                VALUES(1, '2019/02/01', '2019/02/02', 0, 0, 1, '2019/02/27', '01d4e959-f983-4e33-a0e8-d753986bda1c');" +
+                @"INSERT INTO cust_booking(cust_id, date_booking_made, date_for_booking, booking_activated, hide_booking, room_ID, booking_finish_date, qrcode_guid, booking_completed)
+                VALUES(1, '2019/02/01', '2019/02/02', 1, 0, 1, '2019/02/27', '01d4e959-f983-4e33-a0e8-d753986bda1c', 0);" +
 
-                @"INSERT INTO cust_booking(cust_id, date_booking_made, date_for_booking, booking_activated, hide_booking, room_ID, booking_finish_date, qrcode_guid)
-                VALUES(1, '2019/02/01', '2019/05/21', 0, 0, 2, '2019/02/27', 'deb8ebc8-e251-40ea-bf20-78bf142d1dda');" +
+                @"INSERT INTO cust_booking(cust_id, date_booking_made, date_for_booking, booking_activated, hide_booking, room_ID, booking_finish_date, qrcode_guid, booking_completed)
+                VALUES(1, '2019/02/01', '2019/05/21', 0, 0, 2, '2019/05/25', 'deb8ebc8-e251-40ea-bf20-78bf142d1dda', 0);" +
+
+                @"INSERT INTO cust_booking(cust_id, date_booking_made, date_for_booking, booking_activated, hide_booking, room_ID, booking_finish_date, qrcode_guid, booking_completed)
+                VALUES(1, '2019/01/01', '2019/01/11', 0, 0, 2, '2019/01/18', '6820e9da-617d-4382-9208-c3d883a84d8d', 1);" +
 
                 @"INSERT INTO ROOM(room_number, hotel_ID, price_per_day) VALUES (101, 1, 30.5);
-                INSERT INTO ROOM(room_number, hotel_ID, price_per_day) VALUES(102, 1, 30.5);
-                INSERT INTO ROOM(room_number, hotel_ID, price_per_day) VALUES(103, 1, 30.5);
+                INSERT INTO ROOM(room_number, hotel_ID, price_per_day, IsAvailable) VALUES(102, 1, 30.5, 0);
+                INSERT INTO ROOM(room_number, hotel_ID, price_per_day, IsAvailable) VALUES(103, 1, 30.5, 0);
                 INSERT INTO ROOM(room_number, hotel_ID, price_per_day) VALUES(104, 1, 30.5);
                 INSERT INTO ROOM(room_number, hotel_ID, price_per_day) VALUES(201, 1, 30.5);
                 INSERT INTO ROOM(room_number, hotel_ID, price_per_day) VALUES(202, 1, 30.5);
@@ -369,7 +514,10 @@ namespace WebAPIHotel
                 INSERT INTO ROOM(room_number, hotel_ID, price_per_day) VALUES(201, 2, 30.5);
                 INSERT INTO ROOM(room_number, hotel_ID, price_per_day) VALUES(202, 2, 30.5);
                 INSERT INTO ROOM(room_number, hotel_ID, price_per_day) VALUES(203, 2, 30.5);
-                INSERT INTO ROOM(room_number, hotel_ID, price_per_day) VALUES(204, 2, 30.5); ";
+                INSERT INTO ROOM(room_number, hotel_ID, price_per_day) VALUES(204, 2, 30.5);" + 
+
+                @"INSERT INTO hot_staff(hotel_id,staff_first_name, staff_last_name, username, staff_password)
+                VALUES(1, 'George', 'Boulton', 'gb96', 'U8fCSoGfsg429oTcWOSMAsjMUF8jZhVmkKhwiZdfCMCZN5a8')";
 
             using (SqlConnection connection = new SqlConnection(connectionString))
             {
@@ -382,7 +530,7 @@ namespace WebAPIHotel
                     }
                     catch (Exception e)
                     {
-                        string s = e.ToString();
+                       string s = e.ToString();
                         return false;
                     }
                 }
@@ -392,7 +540,7 @@ namespace WebAPIHotel
         }
 
         //Method to get user account from the database
-        public Customer getUser(string email, string password)
+        public Customer GetUser(string email, string password)
         {
             string QUERY = "SELECT * FROM hot_cust WHERE cust_email = @email";
             Customer customer = new Customer { CustId = 0 };
@@ -422,7 +570,7 @@ namespace WebAPIHotel
                             Password = reader["cust_password"].ToString()
                         };
 
-                        bool UserVerified = PasswordVerifyer.Verify(password, c.Password);
+                        bool UserVerified = PasswordVerifier.Verify(password, c.Password);
                         if(UserVerified)
                             return customer = c;
 
@@ -430,6 +578,51 @@ namespace WebAPIHotel
                 }
             }
             return customer;
+        }
+
+
+        public Staff GetStaffMember(string username, string password)
+        {
+            string QUERY = "SELECT * FROM hot_staff WHERE username = @username";
+            Staff staff = new Staff { StaffID = 0 };
+            //Open connection
+            using (SqlConnection connection = new SqlConnection(connectionString))
+            {
+                connection.Open();
+                using (SqlCommand command = new SqlCommand(QUERY, connection))
+                {
+                    //Add user details as Parameters
+                    command.Parameters.AddWithValue("@username", username);
+
+                    //Execute the command
+                    SqlDataReader reader = command.ExecuteReader();
+                    if (reader.HasRows)
+                    {
+                        reader.Read();
+                        int hotelID = Convert.ToInt32(reader["hotel_id"]);
+                        Staff s = new Staff
+                        {
+                            StaffID = Convert.ToInt32(reader["staff_id"]),
+                            FirstName = reader["staff_first_name"].ToString(),
+                            LastName = reader["staff_last_name"].ToString(),
+                            Username = reader["username"].ToString(),
+                            Password = reader["staff_password"].ToString()
+                        };
+
+                        bool UserVerified = PasswordVerifier.Verify(password, s.Password);
+                        if (UserVerified)
+                        {
+                            string hotelCommand = "SELECT * FROM hotel INNER JOIN ROOM ON ROOM.hotel_ID = HOTEL.hotel_id WHERE hotel.hotel_id = {0}";
+                            hotelCommand = String.Format(hotelCommand, hotelID);
+                            List<Object> hotels = Execute(hotelCommand, RequestType.HOTEL_GET_REQUEST);
+                            s.Location = (Hotel)hotels[0];
+                            return staff = s;
+                        }
+
+                    }
+                }
+            }
+            return staff;
         }
 
         public ErrorEnum RegisterNewUser(Object customer)
@@ -474,6 +667,54 @@ namespace WebAPIHotel
                         
                 }
             }
+        }
+
+        public bool BookRoomDown(int RoomID, string report)
+        {
+            string QUERY = "INSERT INTO room_report(room_ID, report) VALUES(@RoomID, @Report);"
+                +"UPDATE ROOM SET IsAvailable = 0 WHERE room_ID = @RoomID";
+            //Open connection
+            using (SqlConnection connection = new SqlConnection(connectionString))
+            {
+                connection.Open();
+                using (SqlCommand command = new SqlCommand(QUERY, connection))
+                {
+                    command.Parameters.AddWithValue("@RoomID", RoomID);
+                    command.Parameters.AddWithValue("@Report", report);
+                    if (command.ExecuteNonQuery() != 0)
+                        return true;
+                }
+            }
+            return false;
+        }
+
+        public bool SolveProblem(int RoomID)
+        {
+            string QUERY = "UPDATE ROOM SET IsAvailable = 1 WHERE room_id = @RoomID";
+            //Open connection
+            using (SqlConnection connection = new SqlConnection(connectionString))
+            {
+                connection.Open();
+                using (SqlCommand command = new SqlCommand(QUERY, connection))
+                {
+                    command.Parameters.AddWithValue("@RoomID", RoomID);
+                    if (command.ExecuteNonQuery() != 0)
+                        return true;
+                }
+            }
+            return false;
+        }
+
+        private Room ConstructRoom(SqlDataReader reader)
+        {
+            Room r = new Room
+            {
+                RoomID = Convert.ToInt32(reader["room_ID"]),
+                RoomNumber = Convert.ToInt32(reader["room_number"]),
+                PricePerDay = float.Parse(reader["price_per_day"].ToString()),
+                IsAvailable = (bool)reader["IsAvailable"]
+            };
+            return r;
         }
     }
 }

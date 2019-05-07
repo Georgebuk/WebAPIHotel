@@ -23,7 +23,7 @@ namespace WebAPIHotel.Controllers
         public string Get(int id)
         {
             getBookingsCMD = String.Format(getBookingsCMD, id);
-            List<Object> bookings = new SQLHandler().execute(getBookingsCMD, RequestType.BOOKING_REQUEST);
+            List<Object> bookings = new SQLHandler().Execute(getBookingsCMD, RequestType.BOOKING_REQUEST);
             string jsonResponse = JsonConvert.SerializeObject(bookings);
             return jsonResponse;
         }
@@ -31,15 +31,23 @@ namespace WebAPIHotel.Controllers
         // POST api/<controller>
         public void Post([FromBody]Booking value)
         {
-            new SQLHandler().executePost(RequestType.BOOKING_POST_REQUEST, value);
+            new SQLHandler().ExecutePost(RequestType.BOOKING_POST_REQUEST, value);
         }
 
         [Route("api/Booking/CheckQR/{QRString}")]
         [HttpGet]
         public string CheckQR(string QRString)
         {
-            string qrexists = new SQLHandler().checkQRString(QRString);
+            string qrexists = new SQLHandler().CheckQRString(QRString);
             return qrexists;
+        }
+
+        [Route("api/Booking/Checkout/{BookingID}")]
+        [HttpGet]
+        public string Checkout(int bookingID)
+        {
+            new SQLHandler().Checkout(bookingID);
+            return "success";
         }
 
         // PUT api/<controller>/5

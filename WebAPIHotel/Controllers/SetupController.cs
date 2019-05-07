@@ -8,7 +8,7 @@ namespace WebAPIHotel.Controllers
         [Route("api/Setup/setupDB")]
         public bool Setup()
         {
-            return new SQLHandler().databaseSetup();
+            return new SQLHandler().DatabaseSetup();
         }
 
         [HttpGet]

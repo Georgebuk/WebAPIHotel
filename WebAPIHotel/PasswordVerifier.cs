@@ -6,7 +6,7 @@ using System.Web;
 
 namespace WebAPIHotel
 {
-    public static class PasswordVerifyer
+    public static class PasswordVerifier
     {
         public static bool Verify(string enteredPass, string savedPassword)
         {
